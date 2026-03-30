@@ -46,3 +46,10 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 warn_no_return = true
 strict_optional = true
+disable_error_code = ["import-untyped"]  # sdl package has no py.typed marker
+
+[[tool.mypy.overrides]]
+module = "sdl.*"
+ignore_missing_imports = true
+ignore_errors = true
+follow_imports = "skip"

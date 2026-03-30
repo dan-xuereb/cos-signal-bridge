@@ -1,15 +1,14 @@
 """Unit tests for signal_bridge.registry."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
-
 from sdl.models.factor import FactorRecord
 from sdl.models.ir import ExpressionNode
-from sdl.types import DiscoveryMethod, FactorStatus, OperatorTag, TypeTag, DATA_SOURCE_BTC_FORGE
+from sdl.types import DATA_SOURCE_BTC_FORGE, DiscoveryMethod, FactorStatus, OperatorTag, TypeTag
 
-from signal_bridge.registry import load_factor, save_factor, list_factors
+from signal_bridge.registry import list_factors, load_factor, save_factor
 from tests.conftest import make_leaf, make_unary
 
 
@@ -17,20 +16,20 @@ def _make_factor(**kwargs) -> FactorRecord:
     """Build a minimal valid FactorRecord for test use."""
     close_leaf = make_leaf(OperatorTag.close)
     lag_node = make_unary(OperatorTag.lag, close_leaf, n=1)
-    defaults = dict(
-        canonical_expr="lag(close, n=1)",
-        expr_ir=lag_node,
-        source_expr="lag(close, n=1)",
-        description="Lagged close by 1 bar.",
-        output_type=TypeTag.Series,
-        input_primitives=["close"],
-        data_sources=[DATA_SOURCE_BTC_FORGE],
-        lookback_bars=1,
-        complexity_score=lag_node.complexity,
-        discovery_method=DiscoveryMethod.hand_crafted,
-        discovery_ts=datetime.now(timezone.utc),
-        author="test-suite",
-    )
+    defaults: dict = {
+        "canonical_expr": "lag(close, n=1)",
+        "expr_ir": lag_node,
+        "source_expr": "lag(close, n=1)",
+        "description": "Lagged close by 1 bar.",
+        "output_type": TypeTag.Series,
+        "input_primitives": ["close"],
+        "data_sources": [DATA_SOURCE_BTC_FORGE],
+        "lookback_bars": 1,
+        "complexity_score": lag_node.complexity,
+        "discovery_method": DiscoveryMethod.hand_crafted,
+        "discovery_ts": datetime.now(UTC),
+        "author": "test-suite",
+    }
     defaults.update(kwargs)
     return FactorRecord(**defaults)
 
