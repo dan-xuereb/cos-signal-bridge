@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cos-signal-bridge"
+version = "0.1.0"
+description = "Bridge: SDL FactorRecord registry + ExpressionNode evaluator"
+requires-python = ">=3.11"
+dependencies = [
+    "cos-sdl>=0.1.0",
+    "pandas>=2.0",
+    "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+sgl = ["xuer-sgl>=0.4.0"]
+bte = ["cos-bte>=0.1.0"]
+dev = ["pytest>=8", "pytest-cov", "black", "mypy", "pandas-stubs"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/signal_bridge"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP"]
+ignore = ["E501"]
+
+[tool.black]
+line-length = 100
+target-version = ['py311', 'py312']
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+strict_optional = true
