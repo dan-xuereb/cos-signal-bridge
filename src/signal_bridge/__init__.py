@@ -27,3 +27,8 @@ try:
     from signal_bridge.provider import extract_signal_dict  # noqa: F401
 except ImportError:
     pass
+
+try:
+    from signal_bridge.feedback import compute_monitoring_update  # noqa: F401
+except ImportError:
+    pass
