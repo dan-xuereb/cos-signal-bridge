@@ -17,18 +17,15 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
-from uuid import UUID, uuid4
 
 import numpy as np
 import pandas as pd
-import pytest
-from sdl.models.config import NormalizationConfig, OosMonitoringConfig, SglIntegration
+from sdl.models.config import OosMonitoringConfig
 from sdl.models.factor import FactorRecord
 from sdl.types import (
     DATA_SOURCE_BTC_FORGE,
     DiscoveryMethod,
     FactorStatus,
-    NormMethod,
     OperatorTag,
     TypeTag,
 )
@@ -61,21 +58,21 @@ def _make_lag1_record(status: FactorStatus = FactorStatus.candidate) -> FactorRe
         params={"n": 1},
         inferred_type=TypeTag.Series,
     )
-    kwargs = dict(
-        canonical_expr="lag(close, n=1)",
-        expr_ir=lag_node,
-        source_expr="lag(close, n=1)",
-        description="Lagged close by 1 bar.",
-        output_type=TypeTag.Series,
-        input_primitives=["close"],
-        data_sources=[DATA_SOURCE_BTC_FORGE],
-        lookback_bars=1,
-        complexity_score=lag_node.complexity,
-        discovery_method=DiscoveryMethod.hand_crafted,
-        discovery_ts=datetime.now(UTC),
-        author="test-suite",
-        status=status,
-    )
+    kwargs = {
+        "canonical_expr": "lag(close, n=1)",
+        "expr_ir": lag_node,
+        "source_expr": "lag(close, n=1)",
+        "description": "Lagged close by 1 bar.",
+        "output_type": TypeTag.Series,
+        "input_primitives": ["close"],
+        "data_sources": [DATA_SOURCE_BTC_FORGE],
+        "lookback_bars": 1,
+        "complexity_score": lag_node.complexity,
+        "discovery_method": DiscoveryMethod.hand_crafted,
+        "discovery_ts": datetime.now(UTC),
+        "author": "test-suite",
+        "status": status,
+    }
     if status == FactorStatus.active:
         kwargs["activation_date"] = datetime.now(UTC)
     if status == FactorStatus.monitoring:
@@ -320,12 +317,12 @@ def test_status_transition_active_to_monitoring(tmp_path: Path) -> None:
     returns = sf.data["close"].pct_change()
     valid_mask = sf.availability[col] == BarAvailabilityState.VALID.value
     combined = pd.DataFrame({"s": signal_lagged, "r": returns}).loc[valid_mask].dropna()
-    actual_ic = combined["s"].corr(combined["r"], method="spearman")
+    combined["s"].corr(combined["r"], method="spearman")
 
     # Create record with explicit monitoring config where ic_floor=0.5 so any IC<0.5 triggers
     record = _make_lag1_record(FactorStatus.active)
     record.oos_monitoring = OosMonitoringConfig(
-        ic_floor=0.5,       # high threshold to make it easy to trigger
+        ic_floor=0.5,  # high threshold to make it easy to trigger
         ic_invalidation=-1.0,  # impossible to trigger invalidation
     )
     registry_dir = tmp_path / "registry"
@@ -568,10 +565,9 @@ def test_insufficient_data_bars_excluded_from_ic(tmp_path: Path) -> None:
     signal_vals_with_nan[:half] = np.nan  # INSUFFICIENT_DATA → must be NaN
     close_vals = np.linspace(100.0, 200.0, n)
 
-    availability_states = (
-        [BarAvailabilityState.INSUFFICIENT_DATA.value] * half
-        + [BarAvailabilityState.VALID.value] * (n - half)
-    )
+    availability_states = [BarAvailabilityState.INSUFFICIENT_DATA.value] * half + [
+        BarAvailabilityState.VALID.value
+    ] * (n - half)
     close_avail = [BarAvailabilityState.VALID.value] * n
 
     index = pd.date_range("2024-01-01", periods=n, freq="1h")
@@ -614,7 +610,7 @@ def test_insufficient_data_bars_excluded_from_ic(tmp_path: Path) -> None:
 
     # Verify that if we did NOT filter, the IC would differ (confirming filtering matters)
     combined_all = pd.DataFrame({"s": signal_lagged, "r": returns}).dropna()
-    ic_all_rows = combined_all["s"].corr(combined_all["r"], method="spearman")
+    combined_all["s"].corr(combined_all["r"], method="spearman")
     # With NaN in first half, combined_all also drops those NaN rows, so IC may match
     # The key assertion remains: our filtered IC matches the expected_ic_valid_only
     assert abs(update_mixed.realized_ic - expected_ic_valid_only) < 1e-10

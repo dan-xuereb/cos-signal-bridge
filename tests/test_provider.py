@@ -12,8 +12,7 @@ from xuer_sgl.types import BarAvailabilityState, GapMode
 from signal_bridge.provider import extract_signal_dict
 
 # Re-use the apply_indicator_spec_to_df helper from test_adapter
-from test_adapter import apply_indicator_spec_to_df
-
+from .test_adapter import apply_indicator_spec_to_df
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -91,7 +90,9 @@ def test_values_match_data(lag1_factor_with_sgl, sample_ohlcv_df) -> None:
     avail = sf.availability[col]
     valid_mask = avail == BarAvailabilityState.VALID.value
     expected_series = sf.data[col][valid_mask]
-    for ts_ns, expected_val in zip(expected_series.index.asi8.tolist(), expected_series.tolist()):
+    for ts_ns, expected_val in zip(
+        expected_series.index.asi8.tolist(), expected_series.tolist(), strict=False
+    ):
         assert ts_ns in result
         assert result[ts_ns] == pytest.approx(expected_val)
 
