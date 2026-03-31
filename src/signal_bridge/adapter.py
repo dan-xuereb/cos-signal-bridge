@@ -15,12 +15,12 @@ try:
     from xuer_sgl.models import IndicatorSpec
     from xuer_sgl.types import BarAvailabilityState, WindowSemantics
 except ImportError:
-    IndicatorSpec = None  # type: ignore[assignment,misc]
-    BarAvailabilityState = None  # type: ignore[assignment,misc]
-    WindowSemantics = None  # type: ignore[assignment,misc]
+    IndicatorSpec = None  # noqa: N816
+    BarAvailabilityState = None  # noqa: N816
+    WindowSemantics = None  # noqa: N816
 
 
-def factor_to_indicator_spec(record: FactorRecord) -> "IndicatorSpec":
+def factor_to_indicator_spec(record: FactorRecord) -> IndicatorSpec:
     """
     Convert a FactorRecord into an SGL IndicatorSpec.
 

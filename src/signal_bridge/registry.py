@@ -88,8 +88,7 @@ def list_factors(
     if not registry_dir.exists():
         return []
     records = [
-        FactorRecord.model_validate_json(p.read_bytes())
-        for p in registry_dir.glob("*.json")
+        FactorRecord.model_validate_json(p.read_bytes()) for p in registry_dir.glob("*.json")
     ]
     if status is not None:
         records = [r for r in records if r.status == status]

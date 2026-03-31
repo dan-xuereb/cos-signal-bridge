@@ -6,14 +6,12 @@ combined_lookback arithmetic, and config=None passthrough.
 
 import numpy as np
 import pandas as pd
-import pytest
 from sdl.models.config import NormalizationConfig
 from sdl.types import NormMethod, OperatorTag
 
 from signal_bridge.evaluator import compute_lookback, evaluate
 from signal_bridge.normalization import make_normalized_callable
 from tests.conftest import make_leaf, make_unary
-
 
 # ---------------------------------------------------------------------------
 # Helper — build test data and lag(close, 1) callable
@@ -36,7 +34,10 @@ def _make_test_data(n: int = 50):
     )
     close_leaf = make_leaf(OperatorTag.close)
     lag_node = make_unary(OperatorTag.lag, close_leaf, n=1)
-    raw_fn = lambda df_: evaluate(lag_node, df_)
+
+    def raw_fn(df_: pd.DataFrame) -> pd.Series:
+        return evaluate(lag_node, df_)
+
     expr_lb = compute_lookback(lag_node)  # returns 1
     return df, raw_fn, expr_lb, lag_node
 
@@ -49,9 +50,7 @@ def _make_test_data(n: int = 50):
 def test_tanh_zscore_basic():
     """tanh_zscore(window=5): first combined_lb=6 bars NaN, rest finite in (-1,1)."""
     df, raw_fn, expr_lb, _ = _make_test_data(50)
-    config = NormalizationConfig(
-        method=NormMethod.tanh_zscore, window=5, clip_lo=-1.0, clip_hi=1.0
-    )
+    config = NormalizationConfig(method=NormMethod.tanh_zscore, window=5, clip_lo=-1.0, clip_hi=1.0)
     combined_lb = expr_lb + config.window  # 1 + 5 = 6
     fn = make_normalized_callable(raw_fn, config, combined_lb)
     result = fn(df)
@@ -66,9 +65,7 @@ def test_tanh_zscore_basic():
 def test_minmax_basic():
     """minmax: valid values are in [0, 1]."""
     df, raw_fn, expr_lb, _ = _make_test_data(50)
-    config = NormalizationConfig(
-        method=NormMethod.minmax, window=0, clip_lo=0.0, clip_hi=1.0
-    )
+    config = NormalizationConfig(method=NormMethod.minmax, window=0, clip_lo=0.0, clip_hi=1.0)
     combined_lb = expr_lb + config.window  # 1 + 0 = 1
     fn = make_normalized_callable(raw_fn, config, combined_lb)
     result = fn(df)
@@ -95,12 +92,13 @@ def test_minmax_constant():
     )
     close_leaf = make_leaf(OperatorTag.close)
     lag_node = make_unary(OperatorTag.lag, close_leaf, n=1)
-    raw_fn = lambda df_: evaluate(lag_node, df_)
+
+    def raw_fn(df_: pd.DataFrame) -> pd.Series:
+        return evaluate(lag_node, df_)
+
     expr_lb = compute_lookback(lag_node)  # 1
 
-    config = NormalizationConfig(
-        method=NormMethod.minmax, window=0, clip_lo=0.0, clip_hi=1.0
-    )
+    config = NormalizationConfig(method=NormMethod.minmax, window=0, clip_lo=0.0, clip_hi=1.0)
     combined_lb = expr_lb + config.window  # 1
     fn = make_normalized_callable(raw_fn, config, combined_lb)
     result = fn(df)
@@ -115,9 +113,7 @@ def test_minmax_constant():
 def test_rank_basic():
     """rank normalization: valid values in (0, 1]."""
     df, raw_fn, expr_lb, _ = _make_test_data(50)
-    config = NormalizationConfig(
-        method=NormMethod.rank, window=0, clip_lo=0.0, clip_hi=1.0
-    )
+    config = NormalizationConfig(method=NormMethod.rank, window=0, clip_lo=0.0, clip_hi=1.0)
     combined_lb = expr_lb + config.window  # 1
     fn = make_normalized_callable(raw_fn, config, combined_lb)
     result = fn(df)
@@ -152,9 +148,7 @@ def test_passthrough():
 def test_clip():
     """clip_lo/clip_hi applied after normalization — no value outside bounds."""
     df, raw_fn, expr_lb, _ = _make_test_data(50)
-    config = NormalizationConfig(
-        method=NormMethod.tanh_zscore, window=5, clip_lo=-0.5, clip_hi=0.5
-    )
+    config = NormalizationConfig(method=NormMethod.tanh_zscore, window=5, clip_lo=-0.5, clip_hi=0.5)
     combined_lb = expr_lb + config.window  # 6
     fn = make_normalized_callable(raw_fn, config, combined_lb)
     result = fn(df)
@@ -167,9 +161,7 @@ def test_clip():
 def test_invert():
     """invert=True negates output vs invert=False (sign flipped on valid bars)."""
     df, raw_fn, expr_lb, _ = _make_test_data(50)
-    config = NormalizationConfig(
-        method=NormMethod.tanh_zscore, window=5, clip_lo=-1.0, clip_hi=1.0
-    )
+    config = NormalizationConfig(method=NormMethod.tanh_zscore, window=5, clip_lo=-1.0, clip_hi=1.0)
     combined_lb = expr_lb + config.window  # 6
 
     fn_normal = make_normalized_callable(raw_fn, config, combined_lb, invert=False)
@@ -196,7 +188,12 @@ def test_warmup_nan_invariant():
     df, raw_fn, expr_lb, _ = _make_test_data(50)
     window = 5
 
-    for method in [NormMethod.tanh_zscore, NormMethod.minmax, NormMethod.rank, NormMethod.passthrough]:
+    for method in [
+        NormMethod.tanh_zscore,
+        NormMethod.minmax,
+        NormMethod.rank,
+        NormMethod.passthrough,
+    ]:
         # tanh_zscore uses window, others window=0 for combined_lb math (but we set window=5 for tanh)
         norm_window = window if method == NormMethod.tanh_zscore else 0
         config = NormalizationConfig(
@@ -206,9 +203,9 @@ def test_warmup_nan_invariant():
         fn = make_normalized_callable(raw_fn, config, combined_lb)
         result = fn(df)
 
-        assert result.iloc[:combined_lb].isna().all(), (
-            f"First {combined_lb} bars must be NaN for method={method.value}"
-        )
+        assert (
+            result.iloc[:combined_lb].isna().all()
+        ), f"First {combined_lb} bars must be NaN for method={method.value}"
 
 
 def test_combined_lookback():

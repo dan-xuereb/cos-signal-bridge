@@ -5,15 +5,14 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
-from sdl.models.config import NormalizationConfig, SglIntegration
+from sdl.models.config import SglIntegration
 from sdl.models.factor import FactorRecord
-from sdl.types import NormMethod
-from signal_bridge.adapter import factor_to_indicator_spec
-from signal_bridge.evaluator import compute_lookback
 from xuer_sgl.models import IndicatorSpec, NaNReport, SignalManifest, StalenessReport, TimeGrid
 from xuer_sgl.signal_frame import SignalFrame
 from xuer_sgl.types import BarAvailabilityState, GapMode, WindowSemantics
 
+from signal_bridge.adapter import factor_to_indicator_spec
+from signal_bridge.evaluator import compute_lookback
 
 # ---------------------------------------------------------------------------
 # Helper — build a SignalFrame from a spec + df (kept in test file, not adapter)
@@ -25,12 +24,14 @@ def apply_indicator_spec_to_df(spec: IndicatorSpec, df: pd.DataFrame) -> SignalF
     result_series = spec.func(df)
     col = spec.outputs[0]
     avail_values = [
-        BarAvailabilityState.INSUFFICIENT_DATA.value
-        if i < spec.lookback
-        else (
-            BarAvailabilityState.MISSING_NATIVE.value
-            if pd.isna(v)
-            else BarAvailabilityState.VALID.value
+        (
+            BarAvailabilityState.INSUFFICIENT_DATA.value
+            if i < spec.lookback
+            else (
+                BarAvailabilityState.MISSING_NATIVE.value
+                if pd.isna(v)
+                else BarAvailabilityState.VALID.value
+            )
         )
         for i, v in enumerate(result_series)
     ]

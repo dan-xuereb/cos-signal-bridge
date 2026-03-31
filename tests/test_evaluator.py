@@ -18,7 +18,6 @@ from signal_bridge.evaluator import compute_lookback, evaluate
 # conftest.py provides: make_leaf, make_unary, make_binary, sample_ohlcv_df
 from tests.conftest import make_binary, make_leaf, make_unary
 
-
 # ---------------------------------------------------------------------------
 # Primitive operator tests
 # ---------------------------------------------------------------------------
@@ -51,12 +50,12 @@ def test_lag_no_lookahead(sample_ohlcv_df: pd.DataFrame) -> None:
     result = evaluate(lag1, sample_ohlcv_df)
 
     assert pd.isna(result.iloc[0]), "First bar must be NaN (no prior bar)"
-    assert result.iloc[1] == pytest.approx(sample_ohlcv_df["close"].iloc[0]), (
-        "Bar 1 must equal close[0] — lag(1) shifts backward, not forward"
-    )
-    assert result.iloc[2] == pytest.approx(sample_ohlcv_df["close"].iloc[1]), (
-        "Bar 2 must equal close[1]"
-    )
+    assert result.iloc[1] == pytest.approx(
+        sample_ohlcv_df["close"].iloc[0]
+    ), "Bar 1 must equal close[0] — lag(1) shifts backward, not forward"
+    assert result.iloc[2] == pytest.approx(
+        sample_ohlcv_df["close"].iloc[1]
+    ), "Bar 2 must equal close[1]"
 
 
 def test_diff_no_lookahead(sample_ohlcv_df: pd.DataFrame) -> None:
@@ -67,9 +66,7 @@ def test_diff_no_lookahead(sample_ohlcv_df: pd.DataFrame) -> None:
 
     assert pd.isna(result.iloc[0]), "First bar must be NaN"
     expected = sample_ohlcv_df["close"].iloc[1] - sample_ohlcv_df["close"].iloc[0]
-    assert result.iloc[1] == pytest.approx(expected), (
-        "Bar 1 must equal close[1] - close[0]"
-    )
+    assert result.iloc[1] == pytest.approx(expected), "Bar 1 must equal close[1] - close[0]"
 
 
 def test_pct_change_no_lookahead(sample_ohlcv_df: pd.DataFrame) -> None:
@@ -89,9 +86,7 @@ def test_roll_mean(sample_ohlcv_df: pd.DataFrame) -> None:
 
     assert result.isna().sum() == 2, "roll_mean(n=3) must have exactly 2 leading NaNs"
     expected_row2 = sample_ohlcv_df["close"].iloc[:3].mean()
-    assert result.iloc[2] == pytest.approx(expected_row2), (
-        "Row 2 must equal mean of first 3 closes"
-    )
+    assert result.iloc[2] == pytest.approx(expected_row2), "Row 2 must equal mean of first 3 closes"
 
 
 def test_roll_std(sample_ohlcv_df: pd.DataFrame) -> None:
@@ -123,9 +118,7 @@ def test_roll_autocorr(sample_ohlcv_df: pd.DataFrame) -> None:
     )
     result = evaluate(ra, sample_ohlcv_df)
 
-    assert result.isna().sum() == 9, (
-        "roll_autocorr(n=10, lag=1) must have exactly 9 leading NaNs"
-    )
+    assert result.isna().sum() == 9, "roll_autocorr(n=10, lag=1) must have exactly 9 leading NaNs"
 
 
 def test_roll_corr_two_series(sample_ohlcv_df: pd.DataFrame) -> None:
@@ -135,9 +128,7 @@ def test_roll_corr_two_series(sample_ohlcv_df: pd.DataFrame) -> None:
     rc5 = make_binary(OperatorTag.roll_corr, close_leaf, volume_leaf, n=5)
     result = evaluate(rc5, sample_ohlcv_df)
 
-    assert result.isna().sum() == 4, (
-        "roll_corr(n=5) must have exactly 4 leading NaNs"
-    )
+    assert result.isna().sum() == 4, "roll_corr(n=5) must have exactly 4 leading NaNs"
 
 
 def test_roll_beta_two_series(sample_ohlcv_df: pd.DataFrame) -> None:
@@ -147,9 +138,7 @@ def test_roll_beta_two_series(sample_ohlcv_df: pd.DataFrame) -> None:
     rb5 = make_binary(OperatorTag.roll_beta, close_leaf, volume_leaf, n=5)
     result = evaluate(rb5, sample_ohlcv_df)
 
-    assert result.isna().sum() == 4, (
-        "roll_beta(n=5) must have exactly 4 leading NaNs"
-    )
+    assert result.isna().sum() == 4, "roll_beta(n=5) must have exactly 4 leading NaNs"
 
 
 # ---------------------------------------------------------------------------
