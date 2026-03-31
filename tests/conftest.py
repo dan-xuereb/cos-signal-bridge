@@ -1,18 +1,19 @@
 """Shared test fixtures for cos-signal-bridge."""
 
-import pytest
-import pandas as pd
-import numpy as np
-from datetime import datetime, timezone
-from uuid import uuid4
+from datetime import UTC, datetime
 
-from sdl.models.ir import ExpressionNode
+import numpy as np
+import pandas as pd
+import pytest
+from sdl.models.config import NormalizationConfig, SglIntegration
 from sdl.models.factor import FactorRecord
+from sdl.models.ir import ExpressionNode
 from sdl.types import (
+    DATA_SOURCE_BTC_FORGE,
     DiscoveryMethod,
+    NormMethod,
     OperatorTag,
     TypeTag,
-    DATA_SOURCE_BTC_FORGE,
 )
 
 
@@ -23,9 +24,7 @@ def make_leaf(op: OperatorTag = OperatorTag.close) -> ExpressionNode:
 
 def make_unary(op: OperatorTag, child: ExpressionNode, **params) -> ExpressionNode:
     """Create a unary operator ExpressionNode."""
-    return ExpressionNode(
-        op=op, children=[child], params=params, inferred_type=TypeTag.Series
-    )
+    return ExpressionNode(op=op, children=[child], params=params, inferred_type=TypeTag.Series)
 
 
 def make_binary(
@@ -53,9 +52,43 @@ def lag1_factor() -> FactorRecord:
         lookback_bars=1,
         complexity_score=lag_node.complexity,
         discovery_method=DiscoveryMethod.hand_crafted,
-        discovery_ts=datetime.now(timezone.utc),
+        discovery_ts=datetime.now(UTC),
         author="test-suite",
     )
+
+
+@pytest.fixture
+def lag1_factor_with_sgl(lag1_factor: FactorRecord) -> FactorRecord:
+    """FactorRecord for lag(close, 1) with SglIntegration populated (passthrough norm)."""
+    lag1_factor.sgl_integration = SglIntegration(
+        signal_name="lag_close_1",
+        signal_version="v1",
+        normalization=NormalizationConfig(
+            method=NormMethod.passthrough,
+            window=0,
+            clip_lo=-999.0,
+            clip_hi=999.0,
+        ),
+        invert=False,
+    )
+    return lag1_factor
+
+
+@pytest.fixture
+def lag1_factor_with_tanh(lag1_factor: FactorRecord) -> FactorRecord:
+    """FactorRecord for lag(close, 1) with tanh_zscore normalization (window=5)."""
+    lag1_factor.sgl_integration = SglIntegration(
+        signal_name="lag_close_1",
+        signal_version="v1",
+        normalization=NormalizationConfig(
+            method=NormMethod.tanh_zscore,
+            window=5,
+            clip_lo=-1.0,
+            clip_hi=1.0,
+        ),
+        invert=False,
+    )
+    return lag1_factor
 
 
 @pytest.fixture
