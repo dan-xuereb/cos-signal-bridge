@@ -10,7 +10,7 @@ except ImportError:
     BarAvailabilityState = None  # noqa: N816
 
 
-def extract_signal_dict(sf: "SignalFrame", col: str) -> dict[int, float]:
+def extract_signal_dict(sf: SignalFrame, col: str) -> dict[int, float]:  # noqa: F821
     """Extract VALID-bar values from a SignalFrame column as a {ts_ns: value} dict.
 
     This is the SGL-to-BTE bridge seam: strategies call ``signal_dict.get(bar.ts_event)``
@@ -37,4 +37,4 @@ def extract_signal_dict(sf: "SignalFrame", col: str) -> dict[int, float]:
     valid_mask = avail == BarAvailabilityState.VALID.value
     valid_data = sf.data[col][valid_mask]
     ts_ns = valid_data.index.asi8
-    return dict(zip(ts_ns.tolist(), valid_data.tolist()))
+    return dict(zip(ts_ns.tolist(), valid_data.tolist(), strict=False))

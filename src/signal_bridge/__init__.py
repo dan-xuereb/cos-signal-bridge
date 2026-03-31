@@ -22,3 +22,8 @@ try:
     from signal_bridge.adapter import factor_to_indicator_spec  # noqa: F401
 except ImportError:
     pass
+
+try:
+    from signal_bridge.provider import extract_signal_dict  # noqa: F401
+except ImportError:
+    pass
