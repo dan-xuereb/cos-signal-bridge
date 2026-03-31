@@ -87,11 +87,13 @@ def test_values_match_data(lag1_factor_with_sgl, sample_ohlcv_df) -> None:
     col = spec.outputs[0]
     result = extract_signal_dict(sf, col)
     assert all(isinstance(v, float) for v in result.values())
-    # Verify each value matches sf.data[col] at the corresponding timestamp
-    for ts_ns, val in result.items():
-        loc = sf.data.index.get_loc(pd.Timestamp(ts_ns, unit="ns"))
-        expected = sf.data[col].iloc[loc]
-        assert val == pytest.approx(expected)
+    # Build expected: map nanosecond timestamp → data value for VALID bars
+    avail = sf.availability[col]
+    valid_mask = avail == BarAvailabilityState.VALID.value
+    expected_series = sf.data[col][valid_mask]
+    for ts_ns, expected_val in zip(expected_series.index.asi8.tolist(), expected_series.tolist()):
+        assert ts_ns in result
+        assert result[ts_ns] == pytest.approx(expected_val)
 
 
 def test_missing_native_excluded() -> None:
