@@ -16,6 +16,7 @@ from uuid import UUID
 
 import pandas as pd
 from sdl.models.factor import FactorRecord
+from sdl.models.governance import GovernancePolicy
 from sdl.models.search import SglFactorMonitoringUpdate
 from sdl.types import FactorStatus
 
@@ -37,6 +38,7 @@ def compute_monitoring_update(
     window_start: datetime,
     window_end: datetime,
     registry_dir: Path,
+    policy: GovernancePolicy | None = None,
 ) -> SglFactorMonitoringUpdate:
     """
     Compute post-backtest realized IC and apply factor status transitions.
@@ -53,6 +55,8 @@ def compute_monitoring_update(
         window_start: Start of the evaluation window.
         window_end: End of the evaluation window.
         registry_dir: Directory where FactorRecord JSON files are stored.
+        policy: GovernancePolicy providing IC thresholds. Defaults to
+            GovernancePolicy.default() if None (ic_floor=0.02, ic_invalidation=0.0).
 
     Returns:
         SglFactorMonitoringUpdate with realized metrics and status flags.
@@ -61,6 +65,9 @@ def compute_monitoring_update(
         RuntimeError: If xuer_sgl is not installed.
         FileNotFoundError: If factor_id does not exist in registry_dir.
     """
+    if policy is None:
+        policy = GovernancePolicy.default()
+
     if SignalFrame is None:
         raise RuntimeError(
             "xuer_sgl is not installed — install with: pip install cos-signal-bridge[sgl]"
@@ -99,8 +106,8 @@ def compute_monitoring_update(
         realized_turnover = 0.0
 
     # Step 6: Determine flagged/invalidate status based on IC thresholds
-    ic_floor = record.oos_monitoring.ic_floor
-    ic_invalidation = record.oos_monitoring.ic_invalidation
+    ic_floor = policy.ic_floor
+    ic_invalidation = policy.ic_invalidation
 
     flagged: bool = realized_ic < ic_floor
     invalidate: bool = realized_ic < ic_invalidation

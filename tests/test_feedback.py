@@ -33,6 +33,8 @@ from xuer_sgl.models import NaNReport, SignalManifest, StalenessReport, TimeGrid
 from xuer_sgl.signal_frame import SignalFrame
 from xuer_sgl.types import BarAvailabilityState, GapMode
 
+from sdl.models.governance import GovernancePolicy
+
 from signal_bridge.feedback import compute_monitoring_update
 from signal_bridge.registry import load_factor, save_factor
 
@@ -319,14 +321,16 @@ def test_status_transition_active_to_monitoring(tmp_path: Path) -> None:
     combined = pd.DataFrame({"s": signal_lagged, "r": returns}).loc[valid_mask].dropna()
     combined["s"].corr(combined["r"], method="spearman")
 
-    # Create record with explicit monitoring config where ic_floor=0.5 so any IC<0.5 triggers
+    # Create record and pass a GovernancePolicy with ic_floor=0.5 so any IC<0.5 triggers
+    # flagging, but ic_invalidation=-1.0 so invalidation is impossible to trigger.
     record = _make_lag1_record(FactorStatus.active)
-    record.oos_monitoring = OosMonitoringConfig(
-        ic_floor=0.5,  # high threshold to make it easy to trigger
-        ic_invalidation=-1.0,  # impossible to trigger invalidation
-    )
     registry_dir = tmp_path / "registry"
     save_factor(record, registry_dir)
+
+    policy = GovernancePolicy(
+        ic_floor=0.5,  # high threshold to make it easy to trigger flagging
+        ic_invalidation=-1.0,  # impossible to trigger invalidation
+    )
 
     update = compute_monitoring_update(
         sf=sf,
@@ -335,6 +339,7 @@ def test_status_transition_active_to_monitoring(tmp_path: Path) -> None:
         window_start=WINDOW_START,
         window_end=WINDOW_END,
         registry_dir=registry_dir,
+        policy=policy,
     )
 
     assert update.flagged is True
@@ -450,18 +455,19 @@ def test_no_status_change_when_ic_above_floor(tmp_path: Path) -> None:
     combined = pd.DataFrame({"s": signal_lagged, "r": returns}).loc[valid_mask].dropna()
     actual_ic = combined["s"].corr(combined["r"], method="spearman")
 
-    # Use high ic_invalidation threshold that won't be triggered, low ic_floor
-    # Set ic_floor well below actual_ic to guarantee no flagging
+    # Pass a GovernancePolicy with ic_floor well below actual_ic to guarantee no flagging,
+    # and ic_invalidation=-2.0 so invalidation is impossible to trigger.
     ic_floor_for_test = actual_ic - 0.5 if actual_ic > 0 else -2.0
 
     record = _make_lag1_record(FactorStatus.active)
-    record.oos_monitoring = OosMonitoringConfig(
-        ic_floor=ic_floor_for_test,
-        ic_invalidation=-2.0,  # impossible to trigger
-    )
     original_status = record.status
     registry_dir = tmp_path / "registry"
     save_factor(record, registry_dir)
+
+    policy = GovernancePolicy(
+        ic_floor=ic_floor_for_test,
+        ic_invalidation=-2.0,  # impossible to trigger
+    )
 
     update = compute_monitoring_update(
         sf=sf,
@@ -470,6 +476,7 @@ def test_no_status_change_when_ic_above_floor(tmp_path: Path) -> None:
         window_start=WINDOW_START,
         window_end=WINDOW_END,
         registry_dir=registry_dir,
+        policy=policy,
     )
 
     assert update.flagged is False
@@ -614,3 +621,62 @@ def test_insufficient_data_bars_excluded_from_ic(tmp_path: Path) -> None:
     # With NaN in first half, combined_all also drops those NaN rows, so IC may match
     # The key assertion remains: our filtered IC matches the expected_ic_valid_only
     assert abs(update_mixed.realized_ic - expected_ic_valid_only) < 1e-10
+
+
+# ---------------------------------------------------------------------------
+# Test 12: GovernancePolicy parameter overrides FactorRecord.oos_monitoring thresholds
+# ---------------------------------------------------------------------------
+
+
+def test_governance_policy_parameter_overrides_thresholds(tmp_path: Path) -> None:
+    """GovernancePolicy thresholds override FactorRecord.oos_monitoring thresholds."""
+    n = 40
+    col = "sdl_lag_close_1_v1"
+    rng = np.random.default_rng(42)
+    signal_vals = rng.standard_normal(n)
+    close_vals = 100.0 + np.cumsum(rng.standard_normal(n) * 0.1)
+    sf = _make_signal_frame(n=n, signal_values=signal_vals, close_values=close_vals, col=col)
+
+    record = _make_lag1_record(FactorStatus.active)
+    # Set oos_monitoring with permissive thresholds (would NOT flag)
+    record.oos_monitoring = OosMonitoringConfig(ic_floor=-2.0, ic_invalidation=-3.0)
+    registry_dir = tmp_path / "registry"
+    save_factor(record, registry_dir)
+
+    # But pass a strict GovernancePolicy that WILL flag
+    strict_policy = GovernancePolicy(ic_floor=0.99, ic_invalidation=-3.0)
+
+    update = compute_monitoring_update(
+        sf=sf, col=col, factor_id=record.factor_id,
+        window_start=WINDOW_START, window_end=WINDOW_END,
+        registry_dir=registry_dir, policy=strict_policy,
+    )
+    # With ic_floor=0.99, random data IC is almost certainly below -> flagged
+    assert update.flagged is True
+
+
+# ---------------------------------------------------------------------------
+# Test 13: GovernancePolicy.default() matches OosMonitoringConfig defaults
+# ---------------------------------------------------------------------------
+
+
+def test_governance_policy_default_matches_oos_monitoring_defaults() -> None:
+    """GovernancePolicy.default() thresholds match OosMonitoringConfig defaults."""
+    policy = GovernancePolicy.default()
+    config = OosMonitoringConfig()
+    assert policy.ic_floor == config.ic_floor
+    assert policy.ic_invalidation == config.ic_invalidation
+
+
+# ---------------------------------------------------------------------------
+# Test 14: GOV-03 — rejected FactorRecord requires rejection_reason
+# ---------------------------------------------------------------------------
+
+
+def test_rejected_factor_requires_rejection_reason() -> None:
+    """GOV-03: FactorRecord with status=rejected and no rejection_reason raises ValidationError."""
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="rejection_reason"):
+        _make_lag1_record(FactorStatus.rejected)
