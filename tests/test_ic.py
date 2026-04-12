@@ -112,14 +112,15 @@ class TestComputeIcReturnType:
 
 class TestComputeIcMaskFiltering:
     def test_mask_excludes_rows(self) -> None:
-        # mask=False on the last element which would break correlation
+        # mask=False on the last element (outlier that inverts the correlation)
+        # signal=99 gets rank 5, returns=-99 gets rank 1 → reversed correlation
         signal = _series(1.0, 2.0, 3.0, 4.0, 99.0)
         returns = _series(0.1, 0.2, 0.3, 0.4, -99.0)
         mask_all = _mask(True, True, True, True, True)
         mask_partial = _mask(True, True, True, True, False)
         ic_all = compute_ic(signal, returns, mask_all)
         ic_partial = compute_ic(signal, returns, mask_partial)
-        # partial mask excludes outlier — correlation should be exactly 1.0
+        # partial mask excludes outlier — perfect correlation on first 4 rows
         assert abs(ic_partial - 1.0) < 1e-6
-        # full mask includes outlier — still high but may differ
-        assert abs(ic_all - 1.0) < 1e-6  # rank correlation is robust here
+        # full mask includes outlier that flips last rank pair — overall IC drops
+        assert ic_all < ic_partial
