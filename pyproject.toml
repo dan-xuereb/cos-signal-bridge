@@ -16,6 +16,7 @@ dependencies = [
 [project.optional-dependencies]
 sgl = ["xuer-sgl>=0.4.0"]
 bte = ["cos-bte>=0.1.0"]
+cie = ["cos-cie>=0.1.0"]
 dev = ["pytest>=8", "pytest-cov", "black", "mypy", "pandas-stubs"]
 
 [tool.hatch.build.targets.wheel]
