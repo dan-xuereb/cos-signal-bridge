@@ -16,6 +16,7 @@ from unittest.mock import patch
 
 import pytest
 
+from cos_cie.composite import CompositeScore
 from cos_cie.library import SignalLibrary
 from cos_cie.models import SignalMeta
 from cos_cie.types import HorizonCategory, Polarity
@@ -68,10 +69,11 @@ def test_compose_signals_returns_scores_for_valid_horizons() -> None:
     assert isinstance(result, dict)
     assert HorizonCategory.FAST in result
     assert HorizonCategory.MEDIUM in result
-    # Score objects have expected fields
+    # Score objects have expected typed fields — no duck-typing
     fast_score = result[HorizonCategory.FAST]
-    assert hasattr(fast_score, "score")
-    assert hasattr(fast_score, "horizon_category")
+    assert isinstance(fast_score, CompositeScore)
+    assert isinstance(fast_score.score, float)
+    assert isinstance(fast_score.horizon_category, HorizonCategory)
     assert fast_score.horizon_category == HorizonCategory.FAST
     assert fast_score.timestamp == TS
 
