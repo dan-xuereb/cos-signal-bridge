@@ -19,6 +19,7 @@ from sdl.models.factor import FactorRecord
 from sdl.models.search import SglFactorMonitoringUpdate
 from sdl.types import FactorStatus
 
+from signal_bridge.ic import compute_ic
 from signal_bridge.registry import load_factor, save_factor
 
 try:
@@ -75,19 +76,11 @@ def compute_monitoring_update(
     # Lag the signal by 1 bar to prevent look-ahead bias (per D-04)
     signal_lagged = sf.data[col].shift(1)
     returns = sf.data["close"].pct_change()
+    realized_ic: float = compute_ic(signal_lagged, returns, valid_mask)
 
-    # Filter to VALID rows only, then drop any remaining NaNs (from shift/pct_change edges)
+    # Rebuild combined for rank IC (Step 4) — same filter as compute_ic applies internally
     combined = pd.DataFrame({"signal": signal_lagged, "returns": returns})
     combined_valid = combined[valid_mask].dropna()
-
-    if len(combined_valid) >= 2:
-        realized_ic: float = float(
-            combined_valid["signal"].corr(combined_valid["returns"], method="spearman")
-        )
-        if pd.isna(realized_ic):
-            realized_ic = 0.0
-    else:
-        realized_ic = 0.0
 
     # Step 4: Compute realized rank IC (Pearson on pct-ranked signal and returns, per D-05)
     if len(combined_valid) >= 2:
