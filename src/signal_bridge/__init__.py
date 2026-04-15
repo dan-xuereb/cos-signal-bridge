@@ -32,3 +32,13 @@ try:
     from signal_bridge.feedback import compute_monitoring_update  # noqa: F401
 except ImportError:
     pass
+
+try:
+    from signal_bridge.walkforward import (  # noqa: F401
+        FoldResult,
+        WalkForwardResult,
+        generate_factor_folds,
+        run_walk_forward,
+    )
+except ImportError:
+    pass
