@@ -11,16 +11,20 @@ dependencies = [
     "cos-sdl>=0.1.0",
     "pandas>=2.0",
     "numpy>=1.26",
+    "pydantic>=2.5",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
 sgl = ["xuer-sgl>=0.4.0"]
 bte = ["cos-bte>=0.1.0"]
-cie = ["cos-cie>=0.1.0"]
 dev = ["pytest>=8", "pytest-cov", "black", "mypy", "pandas-stubs"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/signal_bridge"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/signal_bridge/composition/signals" = "signal_bridge/composition/signals"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

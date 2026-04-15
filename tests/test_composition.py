@@ -1,27 +1,25 @@
 """
-Tests for composition.py — bridge orchestration of CIE compose().
+Tests for composition orchestrator — bridge orchestration across horizons.
 
 Tests cover:
 - compose_signals() returns a dict of {HorizonCategory: CompositeScore} for horizons with signals
 - compose_signals() omits horizons where compose() returns None (D-06)
 - compose_signals() correctly extracts values from signal_values dict and IC from factor_ics dict
 - compose_signals() returns empty dict when no signals have valid IC
-- compose_signals() raises RuntimeError if cos-cie is not installed (optional import guard)
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from unittest.mock import patch
 
-import pytest
-
-from cos_cie.composite import CompositeScore
-from cos_cie.library import SignalLibrary
-from cos_cie.models import SignalMeta
-from cos_cie.types import HorizonCategory, Polarity
-
-from signal_bridge.composition import compose_signals
+from signal_bridge.composition import (
+    CompositeScore,
+    HorizonCategory,
+    Polarity,
+    SignalLibrary,
+    SignalMeta,
+    compose_signals,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -142,19 +140,3 @@ def test_compose_signals_returns_empty_when_no_valid_ic() -> None:
     result = compose_signals(signal_values, factor_ics, lib, TS)
 
     assert result == {}
-
-
-# ---------------------------------------------------------------------------
-# Test 5: compose_signals raises RuntimeError if cos-cie is not installed
-# ---------------------------------------------------------------------------
-
-
-def test_compose_signals_raises_if_cie_not_installed() -> None:
-    """RuntimeError raised with helpful message if cos-cie is not installed."""
-    lib = _make_library(("momentum_1d", "price", HorizonCategory.FAST))
-    signal_values = {"momentum_1d": 0.5}
-    factor_ics = {"momentum_1d": 0.05}
-
-    with patch("signal_bridge.composition.compose", None):
-        with pytest.raises(RuntimeError, match="cos-cie"):
-            compose_signals(signal_values, factor_ics, lib, TS)

@@ -1,0 +1,40 @@
+signals:
+  - name: mvrv_ratio
+    display_name: "Market Value to Realized Value"
+    polarity: negative
+    horizon_category: cycle
+    half_life_days: 90.0
+    theme: onchain_valuation
+    update_frequency: "1D"
+    economic_rationale: "High MVRV indicates market overvaluation relative to aggregate cost basis. Historically precedes corrections."
+    data_source: warehouse_api
+
+  - name: sopr_adjusted
+    display_name: "Adjusted Spent Output Profit Ratio"
+    polarity: positive
+    horizon_category: medium
+    half_life_days: 10.0
+    theme: onchain_profitability
+    update_frequency: "1D"
+    economic_rationale: "SOPR above 1 indicates profitable spending; sustained above-1 readings signal bullish conviction."
+    data_source: warehouse_api
+
+  - name: exchange_net_flow
+    display_name: "Exchange Net Flow (30d)"
+    polarity: negative
+    horizon_category: slow
+    half_life_days: 20.0
+    theme: onchain_flow
+    update_frequency: "1D"
+    economic_rationale: "Net inflows to exchanges signal sell pressure. Net outflows signal accumulation."
+    data_source: warehouse_api
+
+  - name: miner_revenue_momentum
+    display_name: "Miner Revenue 30-Day Change"
+    polarity: positive
+    horizon_category: slow
+    half_life_days: 25.0
+    theme: onchain_miner
+    update_frequency: "1D"
+    economic_rationale: "Rising miner revenue reflects healthy network economics and hash rate commitment."
+    data_source: warehouse_api

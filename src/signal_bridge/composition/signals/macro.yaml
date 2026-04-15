@@ -1,0 +1,30 @@
+signals:
+  - name: yield_curve_slope
+    display_name: "US Treasury Yield Curve Slope (10Y-2Y)"
+    polarity: positive
+    horizon_category: cycle
+    half_life_days: 120.0
+    theme: macro_rates
+    update_frequency: "1D"
+    economic_rationale: "Steeper yield curve indicates growth expectations. Risk assets including BTC tend to perform better in growth environments."
+    data_source: sgl_fred
+
+  - name: financial_conditions_index
+    display_name: "Chicago Fed Financial Conditions Index"
+    polarity: negative
+    horizon_category: slow
+    half_life_days: 30.0
+    theme: macro_conditions
+    update_frequency: "1W"
+    economic_rationale: "Tighter financial conditions (positive FCI) constrain risk appetite and reduce BTC demand."
+    data_source: sgl_fred
+
+  - name: dxy_momentum_20d
+    display_name: "USD Index 20-Day Momentum"
+    polarity: negative
+    horizon_category: medium
+    half_life_days: 15.0
+    theme: macro_fx
+    update_frequency: "1D"
+    economic_rationale: "Strengthening dollar historically creates headwinds for BTC. Negative correlation is well-documented."
+    data_source: sgl_fred

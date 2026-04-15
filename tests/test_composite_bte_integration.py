@@ -14,12 +14,15 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from cos_cie.composite import CompositeScore, SignalContribution
-from cos_cie.library import SignalLibrary
-from cos_cie.models import SignalMeta
-from cos_cie.types import HorizonCategory, Polarity
-
-from signal_bridge.composition import compose_signals
+from signal_bridge.composition import (
+    CompositeScore,
+    HorizonCategory,
+    Polarity,
+    SignalContribution,
+    SignalLibrary,
+    SignalMeta,
+    compose_signals,
+)
 
 
 # ---------------------------------------------------------------------------

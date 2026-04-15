@@ -42,3 +42,18 @@ try:
     )
 except ImportError:
     pass
+
+try:
+    from signal_bridge.composition import (  # noqa: F401
+        CompositeScore,
+        HorizonCategory,
+        Polarity,
+        SignalContribution,
+        SignalLibrary,
+        SignalMeta,
+        apply_polarity,
+        compose,
+        compose_signals,
+    )
+except ImportError:
+    pass

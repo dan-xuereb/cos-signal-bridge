@@ -1,0 +1,40 @@
+signals:
+  - name: momentum_20d
+    display_name: "20-Day Price Momentum"
+    polarity: positive
+    horizon_category: medium
+    half_life_days: 15.0
+    theme: price_momentum
+    update_frequency: "1D"
+    economic_rationale: "20-day return captures medium-term trend following. Positive momentum tends to persist in crypto markets."
+    data_source: sgl_btcforge
+
+  - name: momentum_60d
+    display_name: "60-Day Price Momentum"
+    polarity: positive
+    horizon_category: slow
+    half_life_days: 40.0
+    theme: price_momentum
+    update_frequency: "1D"
+    economic_rationale: "60-day return captures longer-term regime persistence."
+    data_source: sgl_btcforge
+
+  - name: volatility_20d
+    display_name: "20-Day Realized Volatility"
+    polarity: negative
+    horizon_category: medium
+    half_life_days: 15.0
+    theme: price_volatility
+    update_frequency: "1D"
+    economic_rationale: "Higher realized volatility is associated with lower forward risk-adjusted returns in BTC."
+    data_source: sgl_btcforge
+
+  - name: mean_reversion_5d
+    display_name: "5-Day Mean Reversion"
+    polarity: negative
+    horizon_category: fast
+    half_life_days: 3.0
+    theme: price_mean_reversion
+    update_frequency: "1D"
+    economic_rationale: "Short-term price extremes tend to revert. High 5-day return predicts lower subsequent returns."
+    data_source: sgl_btcforge
