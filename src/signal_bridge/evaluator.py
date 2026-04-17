@@ -13,6 +13,7 @@ Param key conventions (D-01/D-02/D-03):
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 from typing import Literal
 
@@ -70,16 +71,37 @@ class ExpressionCostExceeded(ValueError):
 def _node_window(node: ExpressionNode) -> int:
     """Return the single-node window param for cost tracking.
 
-    Probes `params["n"]`, `params["span"]`, `params["halflife"]` in order and
-    returns the first numeric value found, coerced to int. Non-numeric or
-    missing params yield 0 (no window contribution).
+    Probes ``params["n"]``, ``params["span"]``, ``params["halflife"]`` in
+    order and returns the first numeric value found. ``n`` and ``span`` are
+    integer-valued and coerced via ``int(float(...))``. ``halflife`` is
+    float-valued and rounded UP via ``math.ceil`` so that a sub-1 halflife
+    (e.g. ``halflife=0.01``) still contributes a non-zero window to the
+    ``_MAX_WINDOW`` check — otherwise a truncation to 0 would give the
+    impression of "no window" cost for aggressive EWM decays.
+
+    ``ewm``'s ``alpha`` parameter is INTENTIONALLY not cost-gated: alpha is
+    bounded to ``(0, 1)`` by SDL validation and has no integer-window
+    analog, so contributing 0 is correct. See operator_signatures.py for
+    the formal ewm param family (span | alpha | halflife, exactly one).
+
+    Non-numeric or missing params yield 0 (no window contribution).
     """
-    for key in ("n", "span", "halflife"):
-        if key in node.params:
-            try:
-                return int(float(node.params[key]))
-            except (TypeError, ValueError):
-                return 0
+    if "n" in node.params:
+        try:
+            return int(float(node.params["n"]))
+        except (TypeError, ValueError):
+            return 0
+    if "span" in node.params:
+        try:
+            return int(float(node.params["span"]))
+        except (TypeError, ValueError):
+            return 0
+    if "halflife" in node.params:
+        try:
+            # Ceil so fractional halflives (e.g. 0.01) contribute at least 1.
+            return int(math.ceil(float(node.params["halflife"])))
+        except (TypeError, ValueError):
+            return 0
     return 0
 
 

@@ -101,6 +101,56 @@ def test_max_window_exceeded_raises() -> None:
     assert exc.node_id == str(rm.node_id)
 
 
+def test_ewm_alpha_passes_cost_gate() -> None:
+    """ewm(close, alpha=0.99): alpha is not cost-gated — gate lets it through.
+
+    alpha ∈ (0, 1) has no integer-window analog; SDL validation bounds it.
+    Contract: _node_window returns 0 for alpha-only ewm, so the gate passes.
+    """
+    close = make_leaf(OperatorTag.close)
+    ewm_alpha = make_unary(OperatorTag.ewm, close, alpha=0.99)
+
+    # Does not raise — alpha is not cost-gated.
+    result = evaluate(ewm_alpha, pd.DataFrame({"close": [1.0, 2.0, 3.0]}))
+    assert isinstance(result, pd.Series)
+
+
+def test_ewm_halflife_above_window_raises() -> None:
+    """ewm(close, halflife=2000): integer halflife > _MAX_WINDOW triggers gate."""
+    close = make_leaf(OperatorTag.close)
+    ewm_hl = make_unary(OperatorTag.ewm, close, halflife=2000)
+
+    with pytest.raises(ExpressionCostExceeded) as excinfo:
+        evaluate(ewm_hl, pd.DataFrame({"close": [1.0]}))
+
+    exc = excinfo.value
+    assert exc.limit_name == "max_window"
+    assert exc.observed_value == 2000
+    assert exc.limit_value == _MAX_WINDOW == 1024
+    assert exc.node_id == str(ewm_hl.node_id)
+
+
+def test_ewm_fractional_halflife_contributes_at_least_one() -> None:
+    """ewm(close, halflife=0.01): sub-1 halflife must NOT truncate to 0.
+
+    Prior int(float(0.01)) coerced to 0, giving the impression of "no window"
+    cost for aggressive decays. _node_window now ceils halflife so fractional
+    values still contribute to the max_window check.
+    """
+    from signal_bridge.evaluator import _node_window
+
+    close = make_leaf(OperatorTag.close)
+    ewm_tiny = make_unary(OperatorTag.ewm, close, halflife=0.01)
+
+    # _node_window contract: halflife=0.01 -> ceil(0.01) == 1, not 0.
+    assert _node_window(ewm_tiny) == 1
+
+    # Evaluation passes the gate (1 <= _MAX_WINDOW) but the contract is that
+    # halflife now participates in max_window tracking at the low end.
+    result = evaluate(ewm_tiny, pd.DataFrame({"close": [1.0, 2.0, 3.0]}))
+    assert isinstance(result, pd.Series)
+
+
 # ---------------------------------------------------------------------------
 # Structured-field contract: node_id is str, message format
 # ---------------------------------------------------------------------------
