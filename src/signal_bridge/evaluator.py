@@ -522,6 +522,19 @@ def _lookback_n_minus_1(node: ExpressionNode) -> int:
     return int(node.params["n"]) - 1
 
 
+def _lookback_autocorr(node: ExpressionNode) -> int:
+    """Lookback = (n - 1) + lag (roll_autocorr needs n-window + lag offset).
+
+    roll_autocorr's inner `_linear_autocorr` returns NaN when `len(arr) <= lag_`,
+    so a window of size n with lag=k requires the first fully valid output at
+    index (n - 1) + k. Bucketing with the other rolling ops (`_lookback_n_minus_1`)
+    undercounts warmup by `lag`, which would cascade into `combined_lookback` in
+    `adapter.factor_to_indicator_spec` and leave the SignalFrame availability
+    mask shorter than required.
+    """
+    return int(node.params["n"]) - 1 + int(node.params.get("lag", 1))
+
+
 def _lookback_ewm(node: ExpressionNode) -> int:
     """Lookback = span - 1 (for ewm operators)."""
     return int(node.params.get("span", 1)) - 1
@@ -541,7 +554,7 @@ def _lookback_one(_node: ExpressionNode) -> int:
 for _op in (OperatorTag.lag, OperatorTag.diff, OperatorTag.pct_change):
     _LOOKBACK[_op] = _lookback_n
 
-# All single-series rolling ops: own lookback = n - 1
+# All single-series rolling ops (EXCEPT roll_autocorr): own lookback = n - 1
 for _op in (
     OperatorTag.roll_mean,
     OperatorTag.roll_std,
@@ -554,9 +567,11 @@ for _op in (
     OperatorTag.roll_median,
     OperatorTag.roll_rank,
     OperatorTag.roll_zscore,
-    OperatorTag.roll_autocorr,
 ):
     _LOOKBACK[_op] = _lookback_n_minus_1
+
+# roll_autocorr: own lookback = (n - 1) + lag (needs n-window + lag offset)
+_LOOKBACK[OperatorTag.roll_autocorr] = _lookback_autocorr
 
 # Two-series temporal: own lookback = n - 1
 for _op in (OperatorTag.roll_corr, OperatorTag.roll_cov, OperatorTag.roll_beta):

@@ -390,6 +390,35 @@ def test_compute_lookback_crossover() -> None:
     assert compute_lookback(co) == 1
 
 
+def test_compute_lookback_roll_autocorr_includes_lag() -> None:
+    """compute_lookback(roll_autocorr(close, n=10, lag=3)) == (10 - 1) + 3 == 12.
+
+    roll_autocorr needs an n-sized window PLUS lag offset bars before the
+    inner _linear_autocorr produces a non-NaN value; its lookback is not
+    simply n - 1.
+    """
+    close_leaf = make_leaf(OperatorTag.close)
+    ra = ExpressionNode(
+        op=OperatorTag.roll_autocorr,
+        children=[close_leaf],
+        params={"n": 10, "lag": 3},
+        inferred_type=TypeTag.Series,
+    )
+    assert compute_lookback(ra) == 12
+
+
+def test_compute_lookback_roll_autocorr_default_lag() -> None:
+    """compute_lookback(roll_autocorr(close, n=10)) == (10 - 1) + 1 == 10 (default lag=1)."""
+    close_leaf = make_leaf(OperatorTag.close)
+    ra = ExpressionNode(
+        op=OperatorTag.roll_autocorr,
+        children=[close_leaf],
+        params={"n": 10},
+        inferred_type=TypeTag.Series,
+    )
+    assert compute_lookback(ra) == 10
+
+
 # ---------------------------------------------------------------------------
 # Cost gate smoke
 # ---------------------------------------------------------------------------
