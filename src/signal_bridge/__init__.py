@@ -46,20 +46,27 @@ from signal_bridge.walkforward import (  # noqa: F401
 # -------------------------------------------------------------------
 # Optional modules — guarded imports preserved (depend on xuer_sgl
 # or composition extras). Per RESEARCH.md Finding #4.
+#
+# Guard is intentionally narrow (ModuleNotFoundError, not ImportError)
+# so genuine import-time failures — circular imports, malformed submodules,
+# missing re-exports inside an installed optional dep — propagate with a
+# traceback instead of surfacing later as a confusing
+# "cannot import name 'factor_to_indicator_spec' from 'signal_bridge'"
+# with no chain back to the real cause.
 # -------------------------------------------------------------------
 try:
     from signal_bridge.adapter import factor_to_indicator_spec  # noqa: F401
-except ImportError:
+except ModuleNotFoundError:
     pass
 
 try:
     from signal_bridge.provider import extract_signal_dict  # noqa: F401
-except ImportError:
+except ModuleNotFoundError:
     pass
 
 try:
     from signal_bridge.feedback import compute_monitoring_update  # noqa: F401
-except ImportError:
+except ModuleNotFoundError:
     pass
 
 try:
@@ -74,5 +81,5 @@ try:
         compose,
         compose_signals,
     )
-except ImportError:
+except ModuleNotFoundError:
     pass
