@@ -388,3 +388,18 @@ def test_compute_lookback_crossover() -> None:
     volume_leaf = make_leaf(OperatorTag.volume)
     co = make_binary(OperatorTag.crossover, close_leaf, volume_leaf)
     assert compute_lookback(co) == 1
+
+
+# ---------------------------------------------------------------------------
+# Cost gate smoke
+# ---------------------------------------------------------------------------
+
+
+def test_evaluate_triggers_cost_gate_before_dispatch() -> None:
+    """evaluate() pre-flight gate fires before dispatch for over-budget trees."""
+    from signal_bridge.evaluator import ExpressionCostExceeded
+
+    leaf = make_leaf(OperatorTag.close)
+    node = make_unary(OperatorTag.roll_mean, leaf, n=2048)
+    with pytest.raises(ExpressionCostExceeded):
+        evaluate(node, pd.DataFrame({"close": [1.0]}))
