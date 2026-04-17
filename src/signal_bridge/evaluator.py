@@ -14,6 +14,7 @@ Param key conventions (D-01/D-02/D-03):
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Literal
 
 import numpy as np
 import pandas as pd
@@ -32,6 +33,110 @@ _DISPATCH: dict[OperatorTag, _Handler] = {}
 
 _LookbackFn = Callable[[ExpressionNode], int]
 _LOOKBACK: dict[OperatorTag, _LookbackFn] = {}
+
+
+# ---------------------------------------------------------------------------
+# Cost model (BRIDGE-01)
+# ---------------------------------------------------------------------------
+
+_MAX_TOTAL_LOOKBACK: int = 2000
+_MAX_NODE_COUNT: int = 256
+_MAX_WINDOW: int = 1024
+
+_LimitName = Literal["total_lookback", "node_count", "max_window"]
+
+
+class ExpressionCostExceeded(ValueError):
+    """Raised by evaluate() pre-flight gate when a cost limit is exceeded."""
+
+    def __init__(
+        self,
+        *,
+        node_id: str,
+        limit_name: _LimitName,
+        limit_value: int,
+        observed_value: int,
+    ) -> None:
+        self.node_id = node_id
+        self.limit_name = limit_name
+        self.limit_value = limit_value
+        self.observed_value = observed_value
+        super().__init__(
+            f"Expression cost exceeded: {limit_name}={observed_value} "
+            f"> {limit_value} at node_id={node_id!r}"
+        )
+
+
+def _node_window(node: ExpressionNode) -> int:
+    """Return the single-node window param for cost tracking.
+
+    Probes `params["n"]`, `params["span"]`, `params["halflife"]` in order and
+    returns the first numeric value found, coerced to int. Non-numeric or
+    missing params yield 0 (no window contribution).
+    """
+    for key in ("n", "span", "halflife"):
+        if key in node.params:
+            try:
+                return int(float(node.params[key]))
+            except (TypeError, ValueError):
+                return 0
+    return 0
+
+
+def _check_cost(root: ExpressionNode) -> None:
+    """Pre-flight gate: walk the tree once and raise on first BRIDGE-01 violation.
+
+    Tracks three cost metrics in one pass:
+      * node_count — raised when > _MAX_NODE_COUNT; emits the deepest visited node.
+      * max_window — raised when any single node's window > _MAX_WINDOW; emits that node.
+      * total_lookback — raised when any subtree's cumulative lookback > _MAX_TOTAL_LOOKBACK;
+        emits the deepest subtree root at which the budget blew.
+
+    Lookback semantics match `compute_lookback` exactly (additive via `_LOOKBACK` table).
+    """
+    state: dict[str, int] = {"count": 0}
+
+    def _walk(node: ExpressionNode) -> int:
+        # node_count: pre-order increment; deepest-visited node on overflow.
+        state["count"] += 1
+        if state["count"] > _MAX_NODE_COUNT:
+            raise ExpressionCostExceeded(
+                node_id=str(node.node_id),
+                limit_name="node_count",
+                limit_value=_MAX_NODE_COUNT,
+                observed_value=state["count"],
+            )
+
+        # max_window: single-node check, this node is the offender.
+        own_window = _node_window(node)
+        if own_window > _MAX_WINDOW:
+            raise ExpressionCostExceeded(
+                node_id=str(node.node_id),
+                limit_name="max_window",
+                limit_value=_MAX_WINDOW,
+                observed_value=own_window,
+            )
+
+        # Recurse children first (bottom-up aggregation), summing subtree lookbacks.
+        children_lookback = 0
+        for child in node.children:
+            children_lookback += _walk(child)
+
+        # total_lookback: subtree aggregate — this subtree root is the offender when
+        # cumulative additive lookback first breaches the budget.
+        own_lookback_fn = _LOOKBACK.get(node.op)
+        own_lookback = own_lookback_fn(node) if own_lookback_fn else 0
+        subtree_lookback = children_lookback + own_lookback
+        if subtree_lookback > _MAX_TOTAL_LOOKBACK:
+            raise ExpressionCostExceeded(
+                node_id=str(node.node_id),
+                limit_name="total_lookback",
+                limit_value=_MAX_TOTAL_LOOKBACK,
+                observed_value=subtree_lookback,
+            )
+        return subtree_lookback
+
+    _walk(root)
 
 
 # ---------------------------------------------------------------------------
@@ -54,11 +159,19 @@ def evaluate(node: ExpressionNode, df: pd.DataFrame) -> pd.Series:
         pd.Series with the same index as df.
 
     Raises:
+        ExpressionCostExceeded: If the expression tree exceeds any BRIDGE-01
+            cost limit (total_lookback <= 2000, node_count <= 256,
+            max_window <= 1024).
         NotImplementedError: For regime operators (regime_gate, regime_blend,
             regime_switch) which are stubbed in v1.
         NotImplementedError: For any operator not registered in the dispatch table.
     """
-    child_results: list[pd.Series] = [evaluate(child, df) for child in node.children]
+    _check_cost(node)
+    return _evaluate_inner(node, df)
+
+
+def _evaluate_inner(node: ExpressionNode, df: pd.DataFrame) -> pd.Series:
+    child_results: list[pd.Series] = [_evaluate_inner(c, df) for c in node.children]
     handler = _DISPATCH.get(node.op)
     if handler is None:
         raise NotImplementedError(f"No handler registered for operator: {node.op.value!r}")
