@@ -82,6 +82,140 @@ iteration leaves a consistent on-disk state.
 
 ---
 
+## Public API (v3.1)
+
+`cos-signal-bridge` exposes a stable, typed public surface for Marimo research
+notebooks. The import path is `signal_bridge` (the Python package name);
+`cos-signal-bridge` is the distribution name on PyPI / in `pyproject.toml`.
+
+### Researcher-facing symbols
+
+| Symbol | Purpose | Phase |
+|---|---|---|
+| `evaluate(expression, df) -> pd.Series` | Evaluate an `ExpressionNode` DAG with a pre-flight cost gate | BRIDGE-01 |
+| `compute_lookback(expression) -> int` | Preview warmup-bar count before calling `evaluate` | (shipped pre-v3.1) |
+| `ExpressionCostExceeded(ValueError)` | Raised by `evaluate` on cost-limit violation | BRIDGE-01 |
+| `OperatorSignature` | Pydantic v2 frozen model: arity, shape, param types, window bounds | BRIDGE-03 |
+| `OperatorSignatureRegistry` | `dict[OperatorTag, OperatorSignature]` — every operator covered | BRIDGE-03 |
+| `run_walk_forward(factor_record, folds, data) -> WalkForwardResult` | Walk-forward harness (Flask-free — safe inside Marimo) | BRIDGE-02 |
+| `WalkForwardResult`, `FoldResult` | Typed result containers | (shipped pre-v3.1) |
+| `generate_factor_folds(start, end, test_days) -> list[WindowSpec]` | OOS-only fold generator (no train window — implicit zero) | (shipped pre-v3.1) |
+| `_build_ephemeral_factor_record(expression, metadata) -> FactorRecord` | Build a `FactorRecord(status=pending)` for backtesting without SDL registry writes | BRIDGE-02 |
+| `EphemeralFactorMetadata` | Typed Pydantic input for the ephemeral helper | BRIDGE-02 |
+
+### Marimo authoring snippet
+
+```python
+# Marimo cell — signal authoring
+import marimo as mo
+from sdl.models.ir import ExpressionNode
+from sdl.types import OperatorTag, TypeTag
+from signal_bridge import (
+    evaluate,
+    ExpressionCostExceeded,
+    OperatorSignatureRegistry,
+)
+
+# Inspect operator contract
+sig = OperatorSignatureRegistry[OperatorTag.roll_mean]
+# OperatorSignature(operand_arity=1, operand_shape='Series',
+#                   param_types={'n': 'int'}, min_window=1, max_window=1024)
+
+# Compose expression: roll_mean(close, n=14)
+close = ExpressionNode(op=OperatorTag.close, inferred_type=TypeTag.Series)
+expr = ExpressionNode(
+    op=OperatorTag.roll_mean,
+    children=[close],
+    params={"n": 14},
+    inferred_type=TypeTag.Series,
+)
+
+# df: pd.DataFrame with a 'close' column
+try:
+    series = evaluate(expr, df)
+except ExpressionCostExceeded as e:
+    # Structured fields for Marimo error-cell rendering:
+    # e.node_id (str UUID), e.limit_name, e.limit_value, e.observed_value
+    mo.md(f"**Cost exceeded:** `{e.limit_name}` at node `{e.node_id}`")
+```
+
+### Static cost model (BRIDGE-01)
+
+`evaluate()` runs a single pre-flight visitor over the expression DAG and raises
+`ExpressionCostExceeded` before any operator handler executes. Limits (hard-coded in
+v3.1; no env overrides):
+
+| Limit | Value | Semantics |
+|---|---|---|
+| `total_lookback` | `<= 2000` | Additive warmup bars across the whole tree (matches `compute_lookback`) |
+| `node_count` | `<= 256` | Total nodes in the DAG |
+| `max_window` | `<= 1024` | Largest single-node window param (`n` / `span` / `halflife`) |
+
+`ExpressionCostExceeded` carries structured fields: `node_id: str`, `limit_name`,
+`limit_value: int`, `observed_value: int`. The message template is:
+
+```
+Expression cost exceeded: {limit_name}={observed_value} > {limit_value} at node_id='{uuid}'
+```
+
+### Walk-forward (BRIDGE-02)
+
+```python
+from datetime import date
+from signal_bridge import (
+    run_walk_forward,
+    generate_factor_folds,
+    _build_ephemeral_factor_record,
+    EphemeralFactorMetadata,
+)
+
+metadata = EphemeralFactorMetadata(
+    name="mean reversion 14d",
+    signal_name="mr_14",
+    version="0.1.0",
+    author="researcher@example.com",
+)
+factor = _build_ephemeral_factor_record(expr, metadata)  # status=pending, no registry write
+
+# NOTE: generate_factor_folds is OOS-only (no train window — implicit zero per
+# D-09/D-10). The signature is (start, end, test_days) — there is no train_days
+# kwarg at the bridge layer; the lower-level
+# cos_bte.walkforward.windows.generate_windows is always invoked with a zero
+# train window internally.
+folds = generate_factor_folds(
+    start=date(2020, 1, 1),
+    end=date(2024, 12, 31),
+    test_days=90,
+)
+result = run_walk_forward(factor, folds, data)  # WalkForwardResult
+```
+
+`run_walk_forward` has no `flask`, `fastapi`, or `uvicorn` in its import closure
+(pinned by `tests/test_import_no_flask.py`). The ephemeral helper NEVER writes to
+the SDL registry — the resulting `FactorRecord` lives only in the notebook session
+with `FactorStatus.pending`.
+
+### Operator signature registry (BRIDGE-03)
+
+`OperatorSignatureRegistry` maps every `OperatorTag` (80 values, including regime
+stubs) to an `OperatorSignature`. Useful for notebook-side operand-shape validation
+before calling `evaluate`:
+
+```python
+from sdl.types import OperatorTag
+from signal_bridge import OperatorSignatureRegistry
+
+sig = OperatorSignatureRegistry[OperatorTag.roll_corr]
+assert sig.operand_arity == 2
+assert sig.operand_shape == "Series"
+assert sig.param_types == {"n": "int"}
+```
+
+A CI coverage test (`tests/test_operator_signatures.py`) asserts 100% enum coverage
+and fails with a readable diff of missing/extra keys on any future drift.
+
+---
+
 ## API Reference
 
 ### signal_bridge.registry
