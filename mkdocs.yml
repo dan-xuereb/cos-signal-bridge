@@ -1,0 +1,35 @@
+site_name: cos-signal-bridge
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - content.code.copy
+    - search.suggest
+
+nav:
+  - Overview: index.md
+  - Architecture: architecture.md
+  - API: api.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_root_heading: true
+            members_order: alphabetical
+            extensions:
+              - griffe_pydantic
+            show_submodules: true
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
