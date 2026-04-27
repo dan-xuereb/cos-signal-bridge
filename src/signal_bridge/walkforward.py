@@ -129,6 +129,11 @@ def _compute_fold_metrics(
     """
     start_ts = pd.Timestamp(test_start)
     end_ts = pd.Timestamp(test_end)
+    # Match the signal index's tz so tz-aware OHLCV (e.g. cos_data_access UTC)
+    # doesn't break the comparison with a tz-naive boundary.
+    if signal.index.tz is not None:
+        start_ts = start_ts.tz_localize(signal.index.tz)
+        end_ts = end_ts.tz_localize(signal.index.tz)
     idx_mask = (signal.index >= start_ts) & (signal.index < end_ts)
     sig_slice = signal[idx_mask]
     close_slice = close[idx_mask]
