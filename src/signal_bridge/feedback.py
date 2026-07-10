@@ -39,6 +39,7 @@ def compute_monitoring_update(
     window_end: datetime,
     registry_dir: Path,
     policy: GovernancePolicy | None = None,
+    cost_ic_penalty_per_unit_turnover: float = 0.0,
 ) -> SglFactorMonitoringUpdate:
     """
     Compute post-backtest realized IC and apply factor status transitions.
@@ -47,6 +48,18 @@ def compute_monitoring_update(
     from the SignalFrame using only VALID bars, applies OOS monitoring status
     transition logic, writes the updated record atomically, and returns an
     SglFactorMonitoringUpdate.
+
+    The flagged/invalidate verdicts compare realized IC against *effective*
+    thresholds that rise with realized turnover::
+
+        effective_floor        = policy.ic_floor        + cost_ic_penalty_per_unit_turnover * realized_turnover
+        effective_invalidation = policy.ic_invalidation + cost_ic_penalty_per_unit_turnover * realized_turnover
+
+    IC is a Spearman correlation — dimensionless — so a return-denominated
+    trading cost (e.g. 15bps) cannot be subtracted from it directly. Instead,
+    higher-turnover factors must clear a proportionally higher IC hurdle to
+    justify their trading costs. The coefficient is in IC units per unit
+    turnover.
 
     Args:
         sf: SignalFrame containing the factor signal column and 'close' prices.
@@ -57,6 +70,16 @@ def compute_monitoring_update(
         registry_dir: Directory where FactorRecord JSON files are stored.
         policy: GovernancePolicy providing IC thresholds. Defaults to
             GovernancePolicy.default() if None (ic_floor=0.02, ic_invalidation=0.0).
+        cost_ic_penalty_per_unit_turnover: Turnover-cost haircut coefficient,
+            in IC units per unit realized turnover. Default 0.0 preserves
+            legacy behavior exactly (raw-IC comparison; no caller's verdicts
+            change). Calibration guidance: with an assumed ~15bps (0.0015)
+            round-trip cost per unit turnover and typical IC-to-return
+            scaling, a starting calibration of ~0.005–0.02 IC per unit
+            turnover is reasonable; callers opt in explicitly. This is a
+            bridge-local execution-cost calibration, deliberately NOT a
+            GovernancePolicy field — if per-deployment governance later wants
+            to own it, a GovernancePolicy field is the natural migration home.
 
     Returns:
         SglFactorMonitoringUpdate with realized metrics and status flags.
@@ -105,18 +128,26 @@ def compute_monitoring_update(
     if pd.isna(realized_turnover):
         realized_turnover = 0.0
 
-    # Step 6: Determine flagged/invalidate status based on IC thresholds
+    # Step 6: Determine flagged/invalidate status based on turnover-cost-adjusted
+    # effective IC thresholds (raw thresholds when the penalty coefficient is 0.0)
     ic_floor = policy.ic_floor
     ic_invalidation = policy.ic_invalidation
 
-    flagged: bool = realized_ic < ic_floor
-    invalidate: bool = realized_ic < ic_invalidation
+    effective_floor = ic_floor + cost_ic_penalty_per_unit_turnover * realized_turnover
+    effective_invalidation = (
+        ic_invalidation + cost_ic_penalty_per_unit_turnover * realized_turnover
+    )
+
+    flagged: bool = realized_ic < effective_floor
+    invalidate: bool = realized_ic < effective_invalidation
 
     # Step 7: Apply status transitions (per D-02)
     if invalidate and record.status in {FactorStatus.active, FactorStatus.monitoring}:
         record.status = FactorStatus.invalidated
         record.invalidation_reason = (
-            f"Realized IC {realized_ic:.4f} < ic_invalidation {ic_invalidation}"
+            f"Realized IC {realized_ic:.4f} < effective ic_invalidation "
+            f"{effective_invalidation:.4f} (base {ic_invalidation}, turnover penalty "
+            f"{cost_ic_penalty_per_unit_turnover} * {realized_turnover:.4f})"
         )
     elif flagged and record.status == FactorStatus.active:
         record.status = FactorStatus.monitoring
