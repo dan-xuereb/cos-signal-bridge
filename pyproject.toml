@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Bridge: SDL FactorRecord registry + ExpressionNode evaluator"
 requires-python = ">=3.11"
 dependencies = [
-    "cos-sdl>=0.1.0",
+    "sdl>=0.1.0",
     "pandas>=2.0",
     "numpy>=1.26",
     "scipy>=1.10",
