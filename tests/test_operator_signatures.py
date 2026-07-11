@@ -33,8 +33,8 @@ def test_no_extra_keys_in_registry() -> None:
     assert set(OPERATOR_SIGNATURES).issubset(set(OperatorTag))
 
 
-def test_total_count_is_80() -> None:
-    assert len(OPERATOR_SIGNATURES) == 80
+def test_total_count_is_81() -> None:
+    assert len(OPERATOR_SIGNATURES) == 81
 
 
 # ---------------------------------------------------------------------------
@@ -170,7 +170,7 @@ def test_composition_scale_and_combine() -> None:
 
 
 def test_all_primitives_have_arity_zero() -> None:
-    """Per RESEARCH.md _PRIMITIVE_OPS: 20 primitive operators, all arity 0."""
+    """Per _PRIMITIVE_OPS: 21 primitive operators, all arity 0."""
     primitives = {
         OperatorTag.open,
         OperatorTag.high,
@@ -192,8 +192,9 @@ def test_all_primitives_have_arity_zero() -> None:
         OperatorTag.oi,
         OperatorTag.oi_delta,
         OperatorTag.liquidations,
+        OperatorTag.composite,
     }
-    assert len(primitives) == 20
+    assert len(primitives) == 21
     for op in primitives:
         sig = OPERATOR_SIGNATURES[op]
         assert sig.operand_arity == 0, f"{op.value} should be arity 0, got {sig.operand_arity}"

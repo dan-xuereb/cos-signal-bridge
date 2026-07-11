@@ -223,6 +223,14 @@ OPERATOR_SIGNATURES: dict[OperatorTag, OperatorSignature] = {
         min_window=None,
         max_window=None,
     ),
+    # Derived column injected upstream of evaluation (composition score).
+    OperatorTag.composite: OperatorSignature(
+        operand_arity=0,
+        operand_shape="Series",
+        param_types={},
+        min_window=None,
+        max_window=None,
+    ),
     # ------------------------------------------------------------------
     # § 4.2 Unary arithmetic (9) — arity 1, Series, no params, no window.
     # ------------------------------------------------------------------
