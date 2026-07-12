@@ -8,3 +8,7 @@ __pycache__/
 .venv/
 dist/
 build/
+.venv-docs/
+.api-staging/
+site/
+docs/api.md.pre-render-backup
