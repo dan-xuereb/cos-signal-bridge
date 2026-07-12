@@ -1,3 +1,9 @@
+> **REFERENCE-ONLY (2026-07-12).** This repository has been superseded by
+> **`packages/signal_bridge`** in the `xuer-quant` monorepo (ported at commit
+> `df80f85`). It is preserved for history only — do not import from or depend on it.
+> Import `signal_bridge` from the workspace package instead. The repo is
+> intentionally **not** GitHub-archived so the hotfix path stays open.
+
 # cos-signal-bridge
 
 A bridge package that connects COS-SDL factor definitions, COS-SGL signal computation, and
